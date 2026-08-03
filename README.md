@@ -23,6 +23,21 @@ The `documentation` skill starts by discovering the project profile (docs root, 
 package manager, public packages) rather than assuming a layout, so it works with Vocs,
 Docusaurus, Nextra, Starlight, VitePress, Mintlify, or a plain Markdown tree.
 
+## Prerequisites
+
+`CLAUDE.md` describes a development flow that assumes these are installed globally:
+
+- [treehouse](https://github.com/kunchenguid/treehouse) - pooled, pre-warmed git worktrees
+- [fallow](https://github.com/fallow-rs/fallow) - the commit gate, for TypeScript and JavaScript repos
+- [no-mistakes](https://github.com/kunchenguid/no-mistakes) - the push gate, which validates a branch
+  and opens the pull request
+- [`gh`](https://cli.github.com/), authenticated, since `gh-axi` runs on top of it
+
+Plus, inside Claude Code: the `mattpocock-skills` plugin, and the `gh-axi` and `chrome-devtools-axi`
+skills in `~/.claude/skills/`.
+
+Without them, that section of `CLAUDE.md` refers to tools the machine does not have.
+
 ## Installing
 
 Global working agreements and voice profile:
