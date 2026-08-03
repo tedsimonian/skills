@@ -15,7 +15,7 @@ Fast lookup table for coding standards decisions.
 | Testing     | Integration-focused trophy                                |
 | Security    | Boundary validation, multi-layer secrets defense          |
 | Review      | Role-based, automate the automatable                      |
-| Deps        | Blessed list + evaluation matrix                          |
+| Deps        | Evaluation checklist, decision record when load-bearing   |
 
 ## Import Order
 
@@ -102,7 +102,7 @@ const count = response.count || 0;
 ## React Patterns
 
 ```typescript
-// Server state: TanStack Query
+// Server state: the project's data-fetching cache
 const { data: user } = useQuery({ queryKey: ['user', id], queryFn });
 
 // UI state: useState
@@ -123,13 +123,13 @@ const { theme } = useTheme();
 
 ## Adding Dependencies
 
-1. Check [blessed-stack.md](blessed-stack.md)
-2. If blessed: proceed
-3. If not: complete evaluation matrix + ADR
+1. Check whether the project, the platform, or the framework already does the job
+2. If it is genuinely new ground, run the evaluation checklist
+3. If it is load-bearing, record the decision in an ADR
 
-**Evaluation Matrix**:
-- Bundle size impact < threshold
-- Weekly downloads > 10k
+**Evaluation checklist**:
+- Bundle size impact, measured
+- Actively maintained, released within six months
 - Last update within 6 months
 - Compatible license (MIT, Apache, BSD)
 - No critical security advisories

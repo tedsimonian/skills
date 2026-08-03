@@ -97,7 +97,7 @@ Read these on-demand based on the task:
 | Server-side utility lib | ✅ | - | - | ✅ | - | - | - |
 | React UI component lib | - | - | ✅ | - | - | - | - |
 | GraphQL API subgraph | ✅ | - | - | ✅ | - | ✅ | ✅ |
-| Full-stack app (TanStack Start) | ✅ | ✅ | - | ✅ | ✅ | - | ✅ |
+| Full-stack app (SSR) | ✅ | ✅ | - | ✅ | ✅ | - | ✅ |
 | Client-only SPA | ✅ | ✅ | - | - | ✅ | - | ✅ |
 | CLI tool | ✅ | - | - | ✅ | - | - | - |
 

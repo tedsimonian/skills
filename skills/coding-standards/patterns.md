@@ -229,631 +229,176 @@ export function useClipboard(options: UseClipboardOptions = {}): UseClipboardRes
 
 ---
 
-## TanStack Start Patterns
+## Data Loading Patterns
 
-> **For comprehensive TanStack Start patterns**, see [tanstack-start.md](tanstack-start.md) which covers production-ready patterns including:
->
-> - Project structure and organization
-> - Server functions with context patterns
-> - Data fetching and caching strategies
-> - Forms and mutations
-> - Authentication and security
-> - Performance optimization
-> - Testing and deployment
->
-> The examples below provide quick reference patterns.
+The mechanism belongs to whichever framework the project uses.
+These are the shapes that survive the choice.
 
-### Route with Loader
+### Load, Then Render
 
-```typescript
+Resolve data before the component that needs it renders, and let the component assume the data exists.
+A component that branches on `data === undefined` on every line is doing the loading state's job.
+
+```tsx
 /**
- * User profile route with data loading and error handling.
+ * The boundary owns loading and error. The leaf owns rendering.
  */
-import { createFileRoute, notFound } from '@tanstack/react-router';
+export function UserScreen({ userId }: { userId: string }): JSX.Element {
+  return (
+    <ErrorBoundary fallback={<UserError />}>
+      <Suspense fallback={<UserSkeleton />}>
+        <UserProfile userId={userId} />
+      </Suspense>
+    </ErrorBoundary>
+  );
+}
 
-import { getUser } from '@/server/users';
-import { UserProfile } from '@/components/user-profile';
-
-export const Route = createFileRoute('/users/$userId')({
-  // Loader runs on server, data is serialized to client
-  loader: async ({ params }) => {
-    const user = await getUser(params.userId);
-    if (!user) {
-      throw notFound();
-    }
-    return { user };
-  },
-
-  // Component receives typed loader data
-  component: UserProfileRoute,
-
-  // Error boundary for this route
-  errorComponent: ({ error }) => (
-    <div role="alert">
-      <h2>Error loading user</h2>
-      <pre>{error.message}</pre>
-    </div>
-  ),
-
-  // Not found handling
-  notFoundComponent: () => (
-    <div>
-      <h2>User not found</h2>
-      <p>The requested user does not exist.</p>
-    </div>
-  ),
-});
-
-function UserProfileRoute(): ReactNode {
-  const { user } = Route.useLoaderData();
-  return <UserProfile user={user} />;
+function UserProfile({ userId }: { userId: string }): JSX.Element {
+  // The data layer guarantees this resolved. No undefined checks needed.
+  const user = useUser(userId);
+  return <h1>{user.displayName}</h1>;
 }
 ```
 
-### Server Function
+### Parse At The Boundary
+
+Validate the response where it enters the app.
+Everything downstream then works with a known shape rather than a hopeful cast.
 
 ```typescript
-/**
- * Server function for user operations.
- *
- * Runs on the server, callable from client with full type safety.
- */
-import { createServerFn } from '@tanstack/start';
 import { z } from 'zod';
 
-import { db } from '@/db';
-import { users } from '@/db/schema';
-import { eq } from 'drizzle-orm';
-
-const GetUserSchema = z.object({
-  userId: z.string().uuid(),
-});
-
-/**
- * Fetches a user by ID from the database.
- *
- * @param input - Object containing userId
- * @returns User object or null if not found
- * @throws {Error} When database query fails
- */
-export const getUser = createServerFn('GET', async (input: z.infer<typeof GetUserSchema>) => {
-  const validated = GetUserSchema.parse(input);
-
-  const user = await db.query.users.findFirst({
-    where: eq(users.id, validated.userId),
-    columns: {
-      id: true,
-      email: true,
-      name: true,
-      createdAt: true,
-    },
-  });
-
-  return user ?? null;
-});
-
-const UpdateUserSchema = z.object({
-  userId: z.string().uuid(),
-  name: z.string().min(1).max(100),
+const userSchema = z.object({
+  id: z.string().uuid(),
+  displayName: z.string(),
   email: z.string().email(),
+  createdAt: z.coerce.date(),
 });
 
+export type User = z.infer<typeof userSchema>;
+
 /**
- * Updates user profile information.
+ * Fetches a user and validates the payload before it reaches the app.
  *
- * @param input - User update data
- * @returns Updated user object
- * @throws {Error} When user not found or validation fails
+ * @param id - User identifier
+ * @returns The parsed user
+ * @throws {ZodError} When the response does not match the schema
  */
-export const updateUser = createServerFn('POST', async (input: z.infer<typeof UpdateUserSchema>) => {
-  const validated = UpdateUserSchema.parse(input);
+export async function fetchUser(id: string): Promise<User> {
+  const response = await fetch(`/api/users/${id}`);
 
-  const [updated] = await db
-    .update(users)
-    .set({
-      name: validated.name,
-      email: validated.email,
-      updatedAt: new Date(),
-    })
-    .where(eq(users.id, validated.userId))
-    .returning();
-
-  if (!updated) {
-    throw new Error('User not found');
+  if (!response.ok) {
+    throw new HttpError(response.status, `Failed to load user ${id}`);
   }
 
-  return updated;
-});
+  return userSchema.parse(await response.json());
+}
 ```
 
-### TanStack Query with Server Function
+**Why**: a bad payload fails once, at the edge, with a precise error.
+Without this it fails later, somewhere in the UI, as `undefined is not an object`.
+
+### Invalidate, Do Not Hand-Patch
+
+After a mutation, invalidate the affected cache entries and let the read path re-run.
 
 ```typescript
 /**
- * Hook for user data with server function integration.
+ * Correct: state comes back from the server.
  */
-import { useSuspenseQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-
-import { getUser, updateUser } from '@/server/users';
-
-/**
- * Query options factory for user queries.
- *
- * @param userId - User identifier
- * @returns Query options object
- */
-export function userQueryOptions(userId: string) {
-  return {
-    queryKey: ['user', userId] as const,
-    queryFn: () => getUser({ userId }),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  };
+async function onRename(id: string, name: string): Promise<void> {
+  await renameUser(id, name);
+  await cache.invalidate(['user', id]);
 }
 
 /**
- * Hook to fetch user data with suspense.
- *
- * @param userId - User identifier
- * @returns User data (never null due to suspense)
+ * Incorrect: the client guesses what the server did.
+ * Any field the server also touched (updatedAt, slug, audit trail) is now wrong.
  */
-export function useUser(userId: string) {
-  return useSuspenseQuery(userQueryOptions(userId));
-}
-
-/**
- * Hook for updating user with optimistic updates.
- *
- * @returns Mutation object with mutate function
- */
-export function useUpdateUser() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: updateUser,
-    onMutate: async (newData) => {
-      // Cancel outgoing refetches
-      await queryClient.cancelQueries({ queryKey: ['user', newData.userId] });
-
-      // Snapshot previous value
-      const previousUser = queryClient.getQueryData(['user', newData.userId]);
-
-      // Optimistically update
-      queryClient.setQueryData(['user', newData.userId], (old: User | undefined) =>
-        old ? { ...old, ...newData } : old,
-      );
-
-      return { previousUser };
-    },
-    onError: (_err, newData, context) => {
-      // Rollback on error
-      if (context?.previousUser) {
-        queryClient.setQueryData(['user', newData.userId], context.previousUser);
-      }
-    },
-    onSettled: (_data, _error, variables) => {
-      // Refetch after mutation
-      queryClient.invalidateQueries({ queryKey: ['user', variables.userId] });
-    },
-  });
+async function onRenameBad(id: string, name: string): Promise<void> {
+  await renameUser(id, name);
+  cache.set(['user', id], (prev) => ({ ...prev, displayName: name }));
 }
 ```
+
+Optimistic updates are the one exception, and they must roll back on failure.
 
 ---
 
 ## Form Patterns
 
-### TanStack Form with Zod
+### Schema-Validated Form
 
-```typescript
+One schema drives the types, the client validation, and the server validation.
+Whichever form library the project uses, this is the shape to aim for.
+
+```tsx
 /**
- * User settings form with validation and server submission.
+ * User settings form with schema validation and server submission.
  */
-import { useForm } from '@tanstack/react-form';
-import { zodValidator } from '@tanstack/zod-form-adapter';
 import { z } from 'zod';
 
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { useUpdateUser } from '@/hooks/use-user';
-
-const UserSettingsSchema = z.object({
-  name: z.string().min(1, 'Name is required').max(100, 'Name too long'),
-  email: z.string().email('Invalid email address'),
-  bio: z.string().max(500, 'Bio must be under 500 characters').optional(),
+const settingsSchema = z.object({
+  displayName: z.string().min(1, 'Display name is required').max(80),
+  email: z.string().email('Enter a valid email address'),
+  marketingOptIn: z.boolean(),
 });
 
-type UserSettingsData = z.infer<typeof UserSettingsSchema>;
+type SettingsValues = z.infer<typeof settingsSchema>;
 
-export interface UserSettingsFormProps {
-  /** Current user data for initial values */
-  user: { id: string; name: string; email: string; bio?: string };
-  /** Callback on successful save */
-  onSuccess?: () => void;
-}
+export function SettingsForm({ initial, onSave }: SettingsFormProps): JSX.Element {
+  const [values, setValues] = useState<SettingsValues>(initial);
+  const [errors, setErrors] = useState<Partial<Record<keyof SettingsValues, string>>>({});
+  const [submitting, setSubmitting] = useState(false);
 
-/**
- * Form for editing user settings.
- *
- * @param props - Form properties
- * @returns Form component
- */
-export function UserSettingsForm({ user, onSuccess }: UserSettingsFormProps): ReactNode {
-  const updateUser = useUpdateUser();
+  async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
 
-  const form = useForm({
-    defaultValues: {
-      name: user.name,
-      email: user.email,
-      bio: user.bio ?? '',
-    } satisfies UserSettingsData,
-    onSubmit: async ({ value }) => {
-      await updateUser.mutateAsync({
-        userId: user.id,
-        ...value,
-      });
-      onSuccess?.();
-    },
-    validatorAdapter: zodValidator(),
-    validators: {
-      onChange: UserSettingsSchema,
-    },
-  });
+    const parsed = settingsSchema.safeParse(values);
+
+    if (!parsed.success) {
+      setErrors(toFieldErrors(parsed.error));
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      await onSave(parsed.data);
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        form.handleSubmit();
-      }}
-      className="space-y-4"
-    >
-      <form.Field name="name">
-        {(field) => (
-          <div>
-            <label htmlFor={field.name} className="block text-sm font-medium">
-              Name
-            </label>
-            <Input
-              id={field.name}
-              value={field.state.value}
-              onBlur={field.handleBlur}
-              onChange={(e) => field.handleChange(e.target.value)}
-              aria-invalid={field.state.meta.errors.length > 0}
-            />
-            {field.state.meta.errors.map((error) => (
-              <p key={error} className="text-sm text-red-500 mt-1">
-                {error}
-              </p>
-            ))}
-          </div>
-        )}
-      </form.Field>
-
-      <form.Field name="email">
-        {(field) => (
-          <div>
-            <label htmlFor={field.name} className="block text-sm font-medium">
-              Email
-            </label>
-            <Input
-              id={field.name}
-              type="email"
-              value={field.state.value}
-              onBlur={field.handleBlur}
-              onChange={(e) => field.handleChange(e.target.value)}
-              aria-invalid={field.state.meta.errors.length > 0}
-            />
-            {field.state.meta.errors.map((error) => (
-              <p key={error} className="text-sm text-red-500 mt-1">
-                {error}
-              </p>
-            ))}
-          </div>
-        )}
-      </form.Field>
-
-      <form.Field name="bio">
-        {(field) => (
-          <div>
-            <label htmlFor={field.name} className="block text-sm font-medium">
-              Bio
-            </label>
-            <textarea
-              id={field.name}
-              value={field.state.value}
-              onBlur={field.handleBlur}
-              onChange={(e) => field.handleChange(e.target.value)}
-              className="w-full rounded-md border px-3 py-2"
-              rows={3}
-            />
-            <p className="text-sm text-muted-foreground mt-1">
-              {field.state.value.length}/500 characters
-            </p>
-          </div>
-        )}
-      </form.Field>
-
-      <form.Subscribe selector={(state) => [state.canSubmit, state.isSubmitting]}>
-        {([canSubmit, isSubmitting]) => (
-          <Button type="submit" disabled={!canSubmit || isSubmitting}>
-            {isSubmitting ? 'Saving...' : 'Save Changes'}
-          </Button>
-        )}
-      </form.Subscribe>
+    <form onSubmit={handleSubmit} noValidate>
+      <TextField
+        label="Display name"
+        value={values.displayName}
+        error={errors.displayName}
+        onChange={(displayName) => setValues({ ...values, displayName })}
+      />
+      <button type="submit" disabled={submitting}>
+        {submitting ? 'Saving...' : 'Save'}
+      </button>
     </form>
   );
 }
 ```
 
----
+**Rules that hold regardless of library**:
 
-## Drizzle ORM Patterns
-
-### Schema Definition
-
-```typescript
-/**
- * Database schema for user and related tables.
- */
-import { relations } from 'drizzle-orm';
-import { index, pgTable, serial, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
-
-export const users = pgTable(
-  'users',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    email: varchar('email', { length: 255 }).notNull().unique(),
-    name: varchar('name', { length: 100 }).notNull(),
-    avatarUrl: text('avatar_url'),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => ({
-    emailIdx: index('users_email_idx').on(table.email),
-    createdAtIdx: index('users_created_at_idx').on(table.createdAt),
-  }),
-);
-
-export const posts = pgTable(
-  'posts',
-  {
-    id: serial('id').primaryKey(),
-    title: varchar('title', { length: 255 }).notNull(),
-    content: text('content').notNull(),
-    authorId: uuid('author_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
-    publishedAt: timestamp('published_at', { withTimezone: true }),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => ({
-    authorIdx: index('posts_author_idx').on(table.authorId),
-    publishedIdx: index('posts_published_idx').on(table.publishedAt),
-  }),
-);
-
-// Relations for query builder
-export const usersRelations = relations(users, ({ many }) => ({
-  posts: many(posts),
-}));
-
-export const postsRelations = relations(posts, ({ one }) => ({
-  author: one(users, {
-    fields: [posts.authorId],
-    references: [users.id],
-  }),
-}));
-```
-
-### Query Patterns
-
-```typescript
-/**
- * Database query utilities for posts.
- */
-import { and, desc, eq, isNotNull, sql } from 'drizzle-orm';
-
-import { db } from '@/db';
-import { posts, users } from '@/db/schema';
-
-/**
- * Fetches paginated published posts with author information.
- *
- * @param options - Pagination options
- * @param options.page - Page number (1-indexed)
- * @param options.limit - Posts per page
- * @returns Posts with author and total count
- */
-export async function getPublishedPosts(options: { page: number; limit: number }): Promise<{
-  posts: Array<{
-    id: number;
-    title: string;
-    content: string;
-    publishedAt: Date;
-    author: { id: string; name: string };
-  }>;
-  total: number;
-}> {
-  const { page, limit } = options;
-  const offset = (page - 1) * limit;
-
-  const [postsResult, countResult] = await Promise.all([
-    db.query.posts.findMany({
-      where: isNotNull(posts.publishedAt),
-      orderBy: desc(posts.publishedAt),
-      limit,
-      offset,
-      with: {
-        author: {
-          columns: {
-            id: true,
-            name: true,
-          },
-        },
-      },
-    }),
-    db
-      .select({ count: sql<number>`count(*)` })
-      .from(posts)
-      .where(isNotNull(posts.publishedAt)),
-  ]);
-
-  return {
-    posts: postsResult.map((post) => ({
-      id: post.id,
-      title: post.title,
-      content: post.content,
-      publishedAt: post.publishedAt!,
-      author: post.author,
-    })),
-    total: countResult[0]?.count ?? 0,
-  };
-}
-
-/**
- * Creates a new post for a user.
- *
- * @param data - Post data
- * @returns Created post
- */
-export async function createPost(data: {
-  title: string;
-  content: string;
-  authorId: string;
-  publish?: boolean;
-}): Promise<typeof posts.$inferSelect> {
-  const [post] = await db
-    .insert(posts)
-    .values({
-      title: data.title,
-      content: data.content,
-      authorId: data.authorId,
-      publishedAt: data.publish ? new Date() : null,
-    })
-    .returning();
-
-  return post!;
-}
-```
+- The schema is the single source of truth.
+  Never hand-write a type that duplicates it, derive it with `z.infer`.
+- Validate on the server too.
+  Client validation is a user-experience feature, not a security boundary.
+- Disable submit while in flight, and say so in the label.
+  A double-submitted form is a duplicated record.
+- Associate every error with its field for screen readers, not just a summary at the top.
+- `noValidate` on the form, so your messages win over the browser's.
 
 ---
 
-## GraphQL Patterns
-
-### Schema Definition (Federation)
-
-```graphql
-# users-subgraph/schema.graphql
-extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key", "@shareable"])
-
-type Query {
-  user(id: ID!): User
-  users(first: Int, after: String): UserConnection!
-  me: User
-}
-
-type User @key(fields: "id") {
-  id: ID!
-  email: String!
-  name: String!
-  avatarUrl: String
-  createdAt: DateTime!
-}
-
-type UserConnection {
-  edges: [UserEdge!]!
-  pageInfo: PageInfo!
-  totalCount: Int!
-}
-
-type UserEdge {
-  node: User!
-  cursor: String!
-}
-
-type PageInfo {
-  hasNextPage: Boolean!
-  hasPreviousPage: Boolean!
-  startCursor: String
-  endCursor: String
-}
-```
-
-### Resolver Pattern
-
-```typescript
-/**
- * GraphQL resolvers for user queries.
- */
-import type { Resolvers } from '@/generated/graphql';
-import { getUser, getUsers, getCurrentUser } from '@/services/user-service';
-
-export const resolvers: Resolvers = {
-  Query: {
-    user: async (_parent, { id }, context) => {
-      context.logger.info({ userId: id }, 'Fetching user');
-      return getUser(id);
-    },
-
-    users: async (_parent, { first, after }, context) => {
-      const limit = Math.min(first ?? 20, 100);
-      return getUsers({ limit, cursor: after ?? undefined });
-    },
-
-    me: async (_parent, _args, context) => {
-      if (!context.userId) {
-        return null;
-      }
-      return getCurrentUser(context.userId);
-    },
-  },
-
-  User: {
-    __resolveReference: async (reference) => {
-      return getUser(reference.id);
-    },
-  },
-};
-```
-
-### Client Query with Codegen Types
-
-```typescript
-/**
- * GraphQL queries for user data.
- */
-import { gql } from '@apollo/client';
-
-import type { GetUserQuery, GetUserQueryVariables } from '@/generated/graphql';
-import { useQuery } from '@apollo/client';
-
-const GET_USER = gql`
-  query GetUser($id: ID!) {
-    user(id: $id) {
-      id
-      email
-      name
-      avatarUrl
-      createdAt
-    }
-  }
-`;
-
-/**
- * Hook to fetch user by ID.
- *
- * @param userId - User identifier
- * @returns Query result with typed data
- */
-export function useUserQuery(userId: string) {
-  return useQuery<GetUserQuery, GetUserQueryVariables>(GET_USER, {
-    variables: { id: userId },
-  });
-}
-```
-
----
 
 ## Error Handling Patterns
 
@@ -1045,15 +590,14 @@ export function tracingMiddleware() {
 /**
  * Integration tests for UserProfile component.
  */
-import { render, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { UserProfile } from './user-profile';
-import { QueryClientProvider } from '@tanstack/react-query';
-import { createTestQueryClient } from '@/test/utils';
+import { renderWithProviders } from '@/test/utils';
 
 const server = setupServer();
 
@@ -1074,11 +618,7 @@ describe('UserProfile', () => {
         })
       );
 
-      render(
-        <QueryClientProvider client={createTestQueryClient()}>
-          <UserProfile userId="123" />
-        </QueryClientProvider>
-      );
+      renderWithProviders(<UserProfile userId="123" />);
 
       expect(await screen.findByText('John Doe')).toBeInTheDocument();
       expect(screen.getByText('john@example.com')).toBeInTheDocument();
@@ -1099,11 +639,7 @@ describe('UserProfile', () => {
         })
       );
 
-      render(
-        <QueryClientProvider client={createTestQueryClient()}>
-          <UserProfile userId="123" />
-        </QueryClientProvider>
-      );
+      renderWithProviders(<UserProfile userId="123" />);
 
       await user.click(await screen.findByRole('button', { name: /edit/i }));
 
@@ -1120,11 +656,7 @@ describe('UserProfile', () => {
         })
       );
 
-      render(
-        <QueryClientProvider client={createTestQueryClient()}>
-          <UserProfile userId="nonexistent" />
-        </QueryClientProvider>
-      );
+      renderWithProviders(<UserProfile userId="nonexistent" />);
 
       expect(await screen.findByRole('alert')).toHaveTextContent(/error/i);
     });
@@ -1132,63 +664,57 @@ describe('UserProfile', () => {
 });
 ```
 
-### Server Function Unit Test
+### Service Unit Test
+
+Depend on an interface, not on the database client.
+The unit test then needs no mocking framework knowledge of your ORM, and the service stays portable.
 
 ```typescript
 /**
- * Unit tests for user server functions.
+ * Unit tests for the user service.
  */
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { getUser, updateUser } from './user';
-import { db } from '@/db';
+import { createUserService } from './user-service.js';
+import type { UserRepository } from './user-repository.js';
 
-vi.mock('@/db', () => ({
-  db: {
-    query: {
-      users: {
-        findFirst: vi.fn(),
-      },
-    },
-    update: vi.fn(() => ({
-      set: vi.fn(() => ({
-        where: vi.fn(() => ({
-          returning: vi.fn(),
-        })),
-      })),
-    })),
-  },
-}));
+function createRepositoryStub(): UserRepository {
+  return {
+    findById: vi.fn(),
+    update: vi.fn(),
+  };
+}
 
-describe('getUser', () => {
+describe('userService.getUser', () => {
+  let repository: UserRepository;
+  let service: ReturnType<typeof createUserService>;
+
   beforeEach(() => {
-    vi.clearAllMocks();
+    repository = createRepositoryStub();
+    service = createUserService({ repository });
   });
 
-  it('returns user when found', async () => {
-    const mockUser = { id: '123', email: 'test@example.com', name: 'Test' };
-    vi.mocked(db.query.users.findFirst).mockResolvedValue(mockUser);
+  it('returns the user when one exists', async () => {
+    const user = { id: '123', email: 'test@example.com', displayName: 'Test' };
+    vi.mocked(repository.findById).mockResolvedValue(user);
 
-    const result = await getUser({ userId: '123' });
-
-    expect(result).toEqual(mockUser);
-    expect(db.query.users.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.anything(),
-      }),
-    );
+    await expect(service.getUser('123')).resolves.toEqual(user);
+    expect(repository.findById).toHaveBeenCalledWith('123');
   });
 
-  it('returns null when user not found', async () => {
-    vi.mocked(db.query.users.findFirst).mockResolvedValue(undefined);
+  it('returns null when no user exists', async () => {
+    vi.mocked(repository.findById).mockResolvedValue(null);
 
-    const result = await getUser({ userId: 'nonexistent' });
-
-    expect(result).toBeNull();
+    await expect(service.getUser('123')).resolves.toBeNull();
   });
 
-  it('throws on invalid UUID', async () => {
-    await expect(getUser({ userId: 'not-a-uuid' })).rejects.toThrow();
+  it('rejects an identifier that is not a UUID', async () => {
+    await expect(service.getUser('not-a-uuid')).rejects.toThrow();
+    expect(repository.findById).not.toHaveBeenCalled();
   });
 });
 ```
+
+**Why this shape**: the assertions describe behavior the service promises, not the SQL it happens to emit.
+Swapping the ORM leaves these tests untouched.
+See [service-layer.md](service-layer.md) for how the boundary is drawn.

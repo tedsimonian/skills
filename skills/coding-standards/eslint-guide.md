@@ -308,7 +308,7 @@ export function Button() { ... }
 
 **Exceptions configured per-directory**:
 
-- Route files (TanStack/Next.js require default exports)
+- Route or page files, when the framework requires a default export
 - Storybook stories
 - Config files (vite.config.ts, etc.)
 

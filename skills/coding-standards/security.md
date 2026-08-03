@@ -595,9 +595,11 @@ const cspHeader = {
 
 ## SQL Injection Prevention
 
-### Drizzle ORM Protection
+### Let The Query Builder Parameterize
 
-Drizzle uses parameterized queries by default:
+Any mainstream ORM or query builder parameterizes by default.
+Use its query API rather than assembling SQL strings.
+The examples below use one query-builder syntax, but the rule is universal:
 
 ```typescript
 // SAFE: Parameterized query
@@ -616,9 +618,7 @@ const users = await db.query.users.findMany({
 If raw SQL is needed, use parameterized queries:
 
 ```typescript
-import { sql } from 'drizzle-orm';
-
-// SAFE: Parameterized raw query
+// SAFE: Parameterized raw query, values passed as bound parameters
 const result = await db.execute(sql`SELECT * FROM users WHERE email = ${email} AND status = ${status}`);
 
 // DANGEROUS: String concatenation
@@ -666,6 +666,10 @@ function validateCsrf(request: Request): boolean {
 ---
 
 ## GraphQL Security
+
+Applies only if the project exposes a GraphQL API.
+GraphQL adds attack surface that REST does not have, because the client composes the query.
+The option names below are one server implementation's, but every GraphQL server has equivalents.
 
 ### Query Depth Limiting
 

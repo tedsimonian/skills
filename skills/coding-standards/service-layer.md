@@ -156,15 +156,15 @@ export function getServices(): Services {
 
 ## Entry Point Integration
 
-### Website (TanStack Start)
+### Web application
 
 ```typescript
 // apps/website/src/server/data/user-plugins.server.ts
 import { getServices, createServiceContext, toUserError } from '@plugin-marketplace/core';
 
-export const installPlugin = createServerFn({ method: 'POST' })
-  .inputValidator((input: InstallPluginInput) => input)
-  .handler(async ({ data }) => {
+// However your framework declares a server-side handler, the body is the same:
+// resolve the caller, build a context, delegate to the service, map errors out.
+export async function installPlugin(data: InstallPluginInput): Promise<InstallPluginResult> {
     const user = await getCurrentUser();
     const ctx = createServiceContext({
       userId: user?.id ?? null,

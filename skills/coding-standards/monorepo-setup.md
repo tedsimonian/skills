@@ -184,7 +184,7 @@ Add to CI:
 - **`lint` has no dependencies**: ESLint reads source directly unless using type-aware rules
 - **`dev` depends on `^build`**: App dev servers need built dependency packages
 
-For advanced Turborepo optimization (cache debugging, CI optimization, task analysis), see the [turborepo-specialist skill](../turborepo-specialist/SKILL.md).
+For advanced Turborepo optimization, such as cache debugging, CI tuning, and task graph analysis, consult the Turborepo documentation directly.
 
 ### tsconfig.json (Root)
 

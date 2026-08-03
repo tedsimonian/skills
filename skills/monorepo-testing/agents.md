@@ -86,21 +86,21 @@ npx checkly test                # Preview Checkly checks
 
 For comprehensive reference on any testing topic, see:
 - `SKILL.md` - Overview, decision flowchart, all file extensions
-- `NAMING.md` - Complete naming conventions
-- `VITEST.md` - Config patterns, unit/browser/integration templates
-- `STORYBOOK.md` - Story writing, addon-vitest setup
-- `PLAYWRIGHT.md` - E2E, API testing, Page Objects
-- `CHECKLY.md` - Production monitoring
-- `INNGEST.md` - Inngest workflow testing
-- `CI.md` - GitHub Actions, mise tasks, caching
-- `GOTCHAS.md` - Common pitfalls and reliability patterns
-- `REVIEW.md` - Full audit checklist for reviewing test setup compliance
+- `naming.md` - Complete naming conventions
+- `vitest.md` - Config patterns, unit/browser/integration templates
+- `storybook.md` - Story writing, addon-vitest setup
+- `playwright.md` - E2E, API testing, Page Objects
+- `checkly.md` - Production monitoring
+- `inngest.md` - Inngest workflow testing
+- `ci.md` - GitHub Actions, mise tasks, caching
+- `gotchas.md` - Common pitfalls and reliability patterns
+- `review.md` - Full audit checklist for reviewing test setup compliance
 
 ### Reviewing Testing Setup
 
 When asked to "review testing", "audit tests", or "check test setup":
 1. Run `bash tooling/testing-skill/scripts/audit-testing-setup.sh .`
-2. Read `tooling/testing-skill/REVIEW.md` and walk through the manual checklist
+2. Read `tooling/testing-skill/review.md` and walk through the manual checklist
 3. Produce a structured report with violations (🔴), warnings (🟡), coverage gaps, and an action plan
 ```
 
@@ -125,7 +125,7 @@ Copy the "Critical Rules" and "Quick Decision" sections directly into your `CLAU
 
 For in-depth reference, read the relevant file in `tooling/testing-skill/`:
 - [SKILL.md](./tooling/testing-skill/SKILL.md) - Entry point and overview
-- [VITEST.md](./tooling/testing-skill/VITEST.md) - Vitest configuration and templates
+- [vitest.md](./tooling/testing-skill/vitest.md) - Vitest configuration and templates
 - ... (etc.)
 ```
 
@@ -156,7 +156,7 @@ For Cursor or GitHub Copilot, create a rule file:
 # .cursor/rules/testing.md (or .github/copilot-instructions.md)
 
 When creating or modifying test files in this monorepo:
-1. Check the file extension matches the test type (see tooling/testing-skill/NAMING.md)
+1. Check the file extension matches the test type (see tooling/testing-skill/naming.md)
 2. Use the correct test runner APIs for the environment
 3. Follow Page Object pattern for E2E tests
 4. Place integration tests in tests/integration/, not colocated
@@ -198,7 +198,7 @@ Perform a thorough review of the testing setup in this repository.
 
 ## Instructions
 
-1. Read `tooling/testing-skill/REVIEW.md` for the complete review methodology.
+1. Read `tooling/testing-skill/review.md` for the complete review methodology.
 
 2. Run the automated audit script:
    ```bash
@@ -207,10 +207,10 @@ Perform a thorough review of the testing setup in this repository.
 
 3. Review the script output. For each violation or warning, note the check ID and details.
 
-4. Walk through the manual checklist in REVIEW.md, focusing on sections relevant to the packages in this repo. For each package/app:
+4. Walk through the manual checklist in review.md, focusing on sections relevant to the packages in this repo. For each package/app:
    - Identify its type (server-utils, UI lib, GraphQL API, full-stack app, CLI, SPA)
    - Check which test types it should have (see the matrix in SKILL.md)
-   - Verify configs follow the correct pattern for that type (see VITEST.md)
+   - Verify configs follow the correct pattern for that type (see vitest.md)
    - Check test quality: naming, isolation, mocking patterns
 
 5. Perform the coverage gap analysis: for each package, does it have the right test types at the right layers?
@@ -266,10 +266,10 @@ If you don't use slash commands, add this to your `CLAUDE.md` instead:
 
 When I ask you to "review testing", "audit tests", "check test setup", or similar:
 
-1. Read `tooling/testing-skill/REVIEW.md`
+1. Read `tooling/testing-skill/review.md`
 2. Run `bash tooling/testing-skill/scripts/audit-testing-setup.sh .`
 3. Walk through the manual checklist for each package
-4. Produce the structured report format defined in REVIEW.md Phase 4
+4. Produce the structured report format defined in review.md Phase 4
 ```
 
 ---
@@ -282,7 +282,7 @@ For Cursor, add to `.cursor/rules/testing-review.md`:
 When the user asks to review or audit the testing setup:
 
 1. Run the audit script: `bash tooling/testing-skill/scripts/audit-testing-setup.sh .`
-2. Read `tooling/testing-skill/REVIEW.md` for the full manual checklist
+2. Read `tooling/testing-skill/review.md` for the full manual checklist
 3. Check each package against the test type matrix in `tooling/testing-skill/SKILL.md`
 4. Produce a structured report with violations (🔴), warnings (🟡), and an action plan
 ```

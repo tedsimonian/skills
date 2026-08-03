@@ -171,11 +171,13 @@ test.describe('Users API', () => {
 })
 ```
 
-## TanStack Start Considerations
+## Meta-Framework (SSR) Considerations
+
+Applies to any server-rendered React framework.
 
 - Use `webServer` to start the dev server (or `build && preview` in CI)
-- Test both SSR (full-page load) and SPA (client-side navigation) paths
-- Playwright auto-waits for hydration - no special handling needed
+- Test both the SSR path (full-page load) and the SPA path (client-side navigation)
+- Playwright auto-waits for hydration, so no special handling is needed
 
 ## Reliability Settings (Non-Optional)
 

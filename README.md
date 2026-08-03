@@ -9,8 +9,9 @@ Code skills I want available across projects.
 CLAUDE.md      global working agreements, applied to every project
 VOICE.md       how I write, for anything posted under my name
 skills/
-  coding-standards/    TypeScript/ESM house style, ESLint, monorepo layout, service layer,
-                       security, TanStack Start, Playwright  (12 files)
+  coding-standards/    framework-agnostic TypeScript and React standards: strict typing,
+                       ESM, React patterns, error handling, service layer, security,
+                       ESLint playbook, monorepo layout  (10 files)
   documentation/       generator-agnostic docs operating manual: repo-truth discovery,
                        Diataxis authoring and maintenance workflows, README templates,
                        MDX component docs, Vocs setup, validate-docs script  (10 files)

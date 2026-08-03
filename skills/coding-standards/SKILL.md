@@ -1,6 +1,6 @@
 ---
 name: coding-standards
-description: Ensures enterprise-grade coding standards, company golden paths and blessed technologies for fullstack TypeScript projects. Use when writing code, reviewing architecture, setting up monorepos, configuring tooling, or addressing ESLint issues. Covers React, TanStack, GraphQL, Bun, Docker, Vite, security, performance, and strict TypeScript patterns.
+description: Enterprise-grade coding standards for TypeScript and React projects, independent of any particular framework. Use when writing code, reviewing architecture, setting up monorepos, configuring tooling, or addressing ESLint issues. Covers strict TypeScript, React patterns, error handling, file organization, testing strategy, security, performance, and CI/CD.
 ---
 
 # Coding Standards & Golden Path
@@ -15,28 +15,16 @@ This skill ensures code follows enterprise-grade standards while maintaining pra
 
 **Trust but Verify**: We trust validated data internally and focus defensive coding at system boundaries. This avoids the performance overhead and code noise of redundant validation while maintaining security where it matters.
 
-## Technology Tiers
+## Scope
 
-Technologies are categorized into four tiers. See [blessed-stack.md](blessed-stack.md) for the complete list with rationale.
+This skill is framework-agnostic.
+It covers TypeScript and React practice that holds regardless of which router, meta-framework, ORM, or data layer a project picks.
 
-| Tier            | Meaning                           | Process                           |
-| --------------- | --------------------------------- | --------------------------------- |
-| **Required**    | Must use for this domain          | No alternatives without ADR       |
-| **Preferred**   | Default choice, proven at scale   | Use unless specific reason not to |
-| **Allowed**     | Acceptable for specific use cases | Document why in PR                |
-| **Discouraged** | Avoid, legacy or superseded       | Requires team review + ADR        |
+Where a project has already chosen a framework, follow that framework's own conventions for routing, data loading, and server code, and apply the standards here on top.
+Do not import patterns from a framework the project does not use.
 
-**Key Required Technologies**:
-
-- Runtime: **Bun** (prefer Bun-native APIs like `Bun.serve`, `Bun.file`, `bun:sqlite`)
-- Framework: **TanStack Start** with TanStack Router
-- Styling: **Tailwind CSS** with **class-variance-authority (CVA)** for variants
-- State: **TanStack Query** for server state, local useState for UI
-- Forms: **TanStack Form**
-- Database: **Drizzle ORM**
-- GraphQL: **Apollo Federation** with GraphQL Codegen
-- Auth: Self-hosted with **better-auth** or **Lucia**
-- i18n: **i18next** / react-i18next
+Adopt a technology per project and record the choice.
+See [Adding New Dependencies](#adding-new-dependencies) for the evaluation checklist and when a decision record is warranted.
 
 ## TypeScript Standards
 
@@ -112,7 +100,7 @@ import path from 'node:path';
 
 // 2. External packages
 import { z } from 'zod';
-import { useMutation } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 
 // 3. Internal aliases (@/)
 import { Button } from '@/components/ui/button.js';
@@ -306,11 +294,55 @@ function Component({ data }) {
 
 ### Server State Separation
 
-- **TanStack Query**: All server/remote state
-- **useState/useReducer**: UI-only ephemeral state (form inputs, toggles)
-- **Context**: Cross-cutting concerns (theme, auth, i18n)
+Server state and UI state are different problems and get different tools.
 
-Never duplicate server state in local state. Never put UI state in Query cache.
+- **A server-state cache** (whichever library the project uses): all remote data, its loading and error states, and its invalidation
+- **useState / useReducer**: UI-only ephemeral state such as form inputs, toggles, and open/closed
+- **Context**: cross-cutting concerns such as theme, auth, and locale
+
+Never copy server state into local state.
+Never put UI state in the server cache.
+
+**Why**: the moment remote data is duplicated into `useState`, you own cache invalidation by hand, and the two copies drift.
+
+### Derived State Is Not State
+
+If a value can be computed from props or existing state, compute it during render.
+Do not mirror it into `useState` and sync it with an effect.
+
+```tsx
+// INCORRECT: mirrored state that can go stale
+const [fullName, setFullName] = useState('');
+useEffect(() => {
+  setFullName(`${first} ${last}`);
+}, [first, last]);
+
+// CORRECT: derive it
+const fullName = `${first} ${last}`;
+```
+
+### Effects Are For Synchronising With The Outside World
+
+`useEffect` is for subscriptions, event listeners, timers, imperative DOM work, and anything else outside React.
+It is not for transforming data, and it is not for responding to user events.
+
+- Reacting to a click belongs in the event handler, not in an effect that watches state
+- Fetching on mount belongs to the data layer, not a hand-rolled effect
+- Every effect that sets state from other state is a derived-state bug
+
+Always return a cleanup function when the effect subscribes to anything.
+
+### Component Design
+
+- Keep components small enough to read in one screen.
+  When a component grows past that, the JSX is usually doing several jobs and each one wants its own child component in its own file.
+- Prefer composition and `children` over configuration props.
+  A wall of boolean props is a sign the component should be split.
+- Props describe intent, not implementation.
+  `variant="danger"` rather than `backgroundColor="red"`.
+- Keys must be stable identity, never array index, whenever the list can reorder, filter, or grow.
+- Do not read or write the DOM directly when React can own it.
+  Refs are for focus, measurement, and integrating non-React code.
 
 ### Async UI Patterns
 
@@ -335,42 +367,27 @@ function UserProfile() {
 }
 ```
 
-### TanStack Start Data Loading
+### Data Loading
 
-Server functions are the primary data loading mechanism:
+The mechanism is the framework's business.
+These rules hold whichever one you are using.
 
-```typescript
-// Server function for data fetching
-const getUser = createServerFn('GET', async (id: string) => {
-  const user = await db.query.users.findFirst({ where: eq(users.id, id) });
-  if (!user) throw notFound();
-  return user;
-});
-
-// Route loader uses server function
-export const Route = createFileRoute('/users/$id')({
-  loader: ({ params }) => getUser(params.id),
-});
-
-// TanStack Query wraps server functions for mutations and refetching
-const mutation = useMutation({
-  mutationFn: (data) => updateUser(data),
-  onSuccess: () => queryClient.invalidateQueries({ queryKey: ['user'] }),
-});
-```
-
-**For comprehensive TanStack Start patterns**, see [tanstack-start.md](tanstack-start.md) which covers:
-
-- Project structure and organization
-- Server function patterns and validation
-- Routing, layouts, and error boundaries
-- Data fetching with TanStack Query integration
-- Forms with TanStack Form
-- Authentication and security
-- Performance optimization
-- Testing strategies
-- Deployment and operations
-- Common patterns and real-world examples
+- **Load as high as the data is needed, and no higher.**
+  Fetch at the route or screen that owns the data, then pass it down or read it from the cache.
+- **Avoid request waterfalls.**
+  Requests that do not depend on each other start together.
+  A child component that fetches something the parent could have requested in parallel is a waterfall.
+- **Every fetch has three visible states.**
+  Loading, error, and empty are designed, not afterthoughts.
+  A spinner with no error path is an unfinished feature.
+- **Errors surface at a boundary, not per-component.**
+  Put the boundary where a user can still do something useful.
+- **Mutations invalidate, they do not hand-patch.**
+  After a write, invalidate the affected cache entries and let the read path re-run.
+  Manually editing cached objects to match what you think the server did is how caches go stale.
+- **Type the data at the boundary.**
+  Parse and validate the response where it enters the app, so everything downstream works with a known shape.
+  See [Security](#security) for the boundary validation rules.
 
 ## File Organization
 
@@ -572,18 +589,47 @@ export default [
 
 ### Adding New Dependencies
 
-1. Check blessed list in [blessed-stack.md](blessed-stack.md)
-2. If on blessed list: proceed
-3. If not: complete evaluation matrix + ADR
+1. Check whether the project already has something that does this job.
+   A second library covering ground the first one covers is a maintenance cost with no upside.
+2. Check whether the platform or the framework already does it.
+3. If it is genuinely new ground, run the evaluation checklist below.
+4. For anything load-bearing, such as a data layer, an auth provider, or a state library, record the decision so the next person knows why.
 
-**Evaluation Matrix**:
+**Evaluation checklist**:
 
-- [ ] Bundle size impact (< X KB threshold)
-- [ ] Weekly downloads (> 10k, actively maintained)
-- [ ] Last update (within 6 months)
-- [ ] License compatibility (MIT, Apache, BSD)
-- [ ] Security advisories (none critical/high)
-- [ ] TypeScript support (native or @types)
+- [ ] Bundle size impact, measured rather than assumed
+- [ ] Actively maintained, with a release in the last six months
+- [ ] Meaningful adoption, so that bugs are found by someone other than you
+- [ ] License compatible with the project (MIT, Apache, BSD)
+- [ ] No unresolved critical or high security advisories
+- [ ] First-class TypeScript types, native or well-maintained `@types`
+- [ ] A plausible exit, meaning you could replace it without rewriting the app
+
+**Decision record**, kept short and in-repo:
+
+```markdown
+# ADR-XXX: Adding [package]
+
+## Status
+
+Accepted | Superseded by ADR-YYY
+
+## Context
+
+What problem forced this decision, and what constraints applied.
+
+## Decision
+
+What we chose.
+
+## Alternatives
+
+What else was considered and why it lost.
+
+## Consequences
+
+What this makes easy, what it makes hard, and what we are now committed to.
+```
 
 ### Hotfix Process
 
@@ -626,12 +672,12 @@ See [monorepo-setup.md](monorepo-setup.md) for complete setup guide.
 
 See [patterns.md](patterns.md) for detailed code examples covering:
 
-- Component patterns (CVA variants, composition)
-- Form handling with TanStack Form
-- GraphQL queries and mutations
-- Drizzle ORM patterns
-- Server function patterns
-- Observability setup
+- Component patterns (variants, composition)
+- Custom hook patterns
+- Form handling and schema validation
+- The Result type for expected failures
+- Structured logging and request tracing
+- Component and unit test patterns
 
 ## Build & Performance
 
@@ -746,18 +792,20 @@ Every workflow file MUST include a header comment block explaining:
 | Imports     | Grouped order, absolute (@/) preferred                    |
 | Errors      | Result for logic, try-catch for I/O, boundaries for React |
 | Performance | Profile first, trust React Compiler                       |
-| State       | Query for server, useState for UI                         |
+| State       | Server cache for remote data, useState for UI             |
 | Testing     | Integration-focused trophy                                |
 | Security    | Boundary validation, multi-layer secrets defense          |
 | Review      | Role-based, automate the automatable                      |
-| Deps        | Blessed list + evaluation matrix                          |
+| Deps        | Evaluation checklist, decision record when load-bearing   |
 | CI/CD       | Cached, gated, documented, version-pinned                 |
 
 ## Sub-Documents
 
-- [tanstack-start.md](tanstack-start.md) - TanStack Start production patterns and best practices
+- [typescript-esm.md](typescript-esm.md) - ESM module resolution and import extensions
+- [patterns.md](patterns.md) - Code examples and patterns
+- [service-layer.md](service-layer.md) - Service layer boundaries and structure
+- [security.md](security.md) - Boundary validation, secrets, and hardening
 - [eslint-guide.md](eslint-guide.md) - Rule-by-rule ESLint playbook
 - [monorepo-setup.md](monorepo-setup.md) - Monorepo structure and tooling
-- [blessed-stack.md](blessed-stack.md) - Complete technology tier list
-- [patterns.md](patterns.md) - Code examples and patterns
+- [quick-reference.md](quick-reference.md) - One-page lookup
 - [security.md](security.md) - Security patterns and checklists
