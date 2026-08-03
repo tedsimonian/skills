@@ -40,12 +40,16 @@ Without them, that section of `CLAUDE.md` refers to tools the machine does not h
 
 ## Installing
 
-Global working agreements and voice profile:
+Global working agreements and voice profile. Symlink rather than copy, so this checkout stays the
+one source of truth and the installed copies cannot drift out of sync:
 
 ```bash
-cp CLAUDE.md ~/.claude/CLAUDE.md
-cp VOICE.md  ~/VOICE.md            # CLAUDE.md references this path
+ln -sf "$PWD/CLAUDE.md" ~/.claude/CLAUDE.md
+ln -sf "$PWD/VOICE.md"  ~/VOICE.md         # CLAUDE.md references this path
 ```
+
+Both links point back into this checkout, so moving or deleting it leaves them dangling and the
+global config silently disappears. Keep the clone somewhere permanent.
 
 Skills, either globally or into a single repo:
 
