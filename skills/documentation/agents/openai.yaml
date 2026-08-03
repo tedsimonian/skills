@@ -1,0 +1,4 @@
+interface:
+  display_name: "Documentation"
+  short_description: "Docs site authoring and upkeep"
+  default_prompt: "Use $documentation to create or update this project's documentation site as an accurate current-state snapshot."

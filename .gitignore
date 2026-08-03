@@ -1,0 +1,11 @@
+# never let credentials in
+config.json
+.claude.json
+.credentials.json
+*.pem
+*.key
+.env
+.env.*
+
+# per-machine, not portable
+settings.local.json
