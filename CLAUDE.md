@@ -56,6 +56,14 @@ Deep detail belongs in commit messages and code comments, not in the PR body.
 
 ## Code
 
+**Load the standards skills before writing code, not after.**
+`coding-standards` applies to any TypeScript or JavaScript work, whether that is a new file, a new module, or a substantial change to an existing one.
+`vercel:react-best-practices` applies on top of it whenever the work touches React, meaning components, hooks, JSX, or any `.tsx` file.
+Read both before generating the first line, since they set the shape of the code rather than catching problems in it.
+They stack: `coding-standards` sets the repo-wide bar for types, structure, error handling, and testing, and `vercel:react-best-practices` covers component-level detail.
+Where they disagree, the narrower React guidance wins on React specifics and `coding-standards` wins on everything else.
+Pass the same requirement into subagent prompts that write code.
+
 **No magic numbers.**
 Every non-obvious literal becomes a named constant with a one-line comment on what it tunes and where it came from.
 Thresholds, offsets, strides, ratios, paddings, durations.
@@ -124,7 +132,7 @@ Typecheck, lint, and format run repo-wide as CI would run them, not only over th
 Changed-file linting misses type errors in files you did not open and formatting gates that fail the build.
 *Why:* this has shipped red branches more than once.
 A transpiling test runner does not typecheck, so a green test run proves nothing about types.
-Which of these runs at commit and which at push is set out under Development flow.
+When each of these runs is set out under Development flow.
 
 **When I say a fix "still doesn't work," suspect a stale build first.**
 Confirm the bundle, artifact, or cache is fresh before re-diagnosing the code.
@@ -154,8 +162,9 @@ Document the bug and work around it locally with a config override or wrapper.
 
 ## Development flow
 
-Four things cover the life of a change: the `mattpocock-skills` plugin for tracking, [fallow](https://github.com/fallow-rs/fallow) as the commit gate, [no-mistakes](https://github.com/kunchenguid/no-mistakes) as the push gate, and [treehouse](https://github.com/kunchenguid/treehouse) for worktrees.
-The three CLIs are already installed globally, so never reinstall them.
+Three things cover the life of a change: the `mattpocock-skills` plugin for tracking, [fallow](https://github.com/fallow-rs/fallow) as the commit gate, and [treehouse](https://github.com/kunchenguid/treehouse) for worktrees.
+Both CLIs are already installed globally, so never reinstall them.
+Everything past the commit gate belongs to the multi-agent orchestrator, which reviews, tests, and green-lights a branch before it merges.
 This section describes *how* to commit and push once I ask, not permission to do either unasked.
 
 ### Repo setup, first time in a repo
@@ -168,15 +177,17 @@ Missing when `docs/agents/issue-tracker.md` does not exist.
 Ask me to run `/setup-matt-pocock-skills`, then wait.
 It writes `docs/agents/` and the `## Agent skills` block that `wayfinder` and the other engineering skills read.
 
-**2. no-mistakes.**
-Missing when `git remote get-url no-mistakes` fails.
-Run `no-mistakes init` yourself from inside the repo, which requires an `origin` remote.
-Run `no-mistakes doctor` if init complains.
-
-**3. fallow.**
+**2. fallow.**
 Missing when none of `.fallowrc.json`, `.fallowrc.jsonc`, `fallow.toml`, or `.fallow.toml` exists.
 Run `fallow recommend`, author the config it suggests, then `fallow hooks install --target git`.
 Skip fallow in repos that are not TypeScript or JavaScript, since that is all it analyses.
+
+**3. Gate policy.**
+Missing when the repo's own `CLAUDE.md` says nothing about gates.
+Ask me whether this repo runs the commit gate on every commit or only merges green-lit code, using AskUserQuestion since it is a closed fork.
+Write my answer into the repo's `CLAUDE.md` under a `## Gate policy` heading, in one or two sentences, along with the date.
+Keeping the answer per repo means I can change the call mid-project without touching any other repo.
+Do not carry a decision across from another repo, and do not assume the answer from how the repo is configured.
 
 treehouse is not on this list because it needs no per-repo setup.
 
@@ -190,14 +201,20 @@ The pool auto-creates, so run `treehouse init` only when the default `treehouse.
 
 ### Commit gate
 
-The cheap checks, on every commit, in this order so it fails fast.
+The cheap checks, in this order so it fails fast.
 
 1. `fallow audit`, which scopes itself to changed files and exits 1 on a fail verdict.
 2. Typecheck.
 3. Lint and format.
 
-Tests and the build are deliberately absent.
-They belong to the push gate, which runs them anyway, so running them per commit buys nothing.
+**How often they run is a per-repo call, recorded in that repo's own `CLAUDE.md`.**
+Under *commit gates*, the three checks above run before every commit, so a bad commit never enters the history.
+Under *merge green-lit code*, commits stay cheap and the same three run once over the branch before it merges, so nothing unchecked lands on the base branch.
+The checks themselves are identical either way; only the frequency changes.
+When the repo has recorded no answer, ask before the first commit rather than guessing, and record what I say.
+
+Tests and the build are deliberately absent from this list.
+They belong to the orchestrator's branch validation, which runs them anyway, so repeating them per commit buys nothing.
 Typecheck stays here because it is the cheap check that catches breakage in files you never opened.
 
 `fallow audit` infers its base from the merge-base against upstream or `origin/HEAD`, so pass `--base <ref>` when that guess is wrong.
@@ -208,22 +225,14 @@ Fix what fails rather than reaching for `--gate`, a baseline, or a suppression t
 `fallow dead-code --trace <file>:<export>` for a symbol, `--trace-dependency <name>` for a package.
 *Why:* an unused-looking export is often reached dynamically, and a wrong deletion fails silently.
 
-### Push gate
+### Branch validation
 
-Every push goes through no-mistakes, which validates the branch and then opens the PR.
-Remind me of this if I reach for a plain `git push`.
-Its pipeline is where the heavy checks live: `rebase`, `lint`, `test`, `review`, `document`, and then `ci` babysitting the PR once it is open.
-The full suite and the build run there, once per branch.
+Everything heavier than the commit gate belongs to the multi-agent orchestrator, not to a local pipeline you drive by hand.
+It reviews the branch, runs the full suite and the build once, and green-lights the result before anything merges.
+Nothing merges on a red or unreviewed branch, whichever gate policy the repo picked.
 
-Drive it through the agent interface, not the interactive commands.
-`no-mistakes axi run --intent "<goal>"` starts a run and blocks until a gate or the outcome.
-`--intent` is required and carries what I set out to accomplish, not a description of the diff.
-`no-mistakes axi status` and `no-mistakes axi logs` inspect a run, and `no-mistakes axi respond` answers an approval gate.
-Commit follow-up fixes on top of the branch, never by resetting or replacing it, so the pipeline's own fix commits survive.
-Never pass `--skip` or run `no-mistakes eject` without asking me first.
-
-On a repo's first run, confirm from `no-mistakes axi status` that the lint and test steps actually executed, since the split above only holds if they do.
-The PR rules above still apply to whatever it opens: read the PR template, confirm the base branch, check the diff file count.
+Commit follow-up fixes on top of the branch, never by resetting or replacing it, so the orchestrator's own fix commits survive.
+The PR rules above still apply to whatever gets opened: read the PR template, confirm the base branch, check the diff file count.
 
 ### Work too big for one session
 
@@ -237,8 +246,7 @@ Its map is an issue labelled `wayfinder:map` with child decision tickets, so che
 An axi is an agent-facing interface over a human-facing tool, built because the raw tool burns context on output meant for a person.
 `gh-axi` for anything touching GitHub, ahead of `gh`, any GitHub MCP tool, and the harness instruction that names `gh` directly.
 `chrome-devtools-axi` for anything needing a real browser, ahead of Playwright, Puppeteer, and any other automation or MCP browser tool.
-`no-mistakes axi` for the push pipeline, as set out under Development flow.
-All three are installed globally, so call the binary directly rather than the `npx -y` form their own docs suggest.
+Both are installed globally, so call the binary directly rather than the `npx -y` form their own docs suggest.
 `gh-axi` still runs on top of `gh`, so if it reports an authentication error, ask me to run `gh auth login` myself rather than trying to fix it.
 
 **Let the owning application author its own files.**
@@ -251,6 +259,45 @@ Some integrations return a success-shaped response while silently no-oping.
 Read the returned payload and confirm the field changed.
 Retry once with an explicit ID, then stop, report what happened, and ask me to do it manually.
 Do not loop on it.
+
+## Resource discipline
+
+This machine has 11 GB of RAM and an 8 GB swap file.
+Agent work has frozen it twice, so treat the rules below as hard limits rather than preferences.
+
+**Four agent sessions at once, counted across the whole tree.**
+Never run more than four concurrently, and never delegate to a sub-agent or background agent from inside one.
+A worker that fans out multiplies past the cap invisibly, because nothing upstream counts the children it spawns.
+Queue the rest and start one only when a slot frees.
+*Why:* a Claude session costs roughly 400 MB before it does any work, and every locally spawned MCP server it loads costs another 200 MB on top of that.
+Seven sessions sat at 4 GB idle, which left one bad command enough room to take the box down.
+
+**Bound every command that reads input you did not write.**
+Web pages, API responses, log files, and search output are all unbounded until proven otherwise.
+Cap the input with `head -c`, put a `timeout` on the command, and run anything experimental inside a subshell with `ulimit -v` set.
+*Why:* one unbounded search over a downloaded page reached 8.9 GB of resident memory and froze the machine.
+
+**Never put a quantifier on both sides of an alternation.**
+A pattern shaped like `X{0,n}(a|b|c)Y{0,m}` under `-o` enumerates every combination of leading and trailing length at every match position, and HTML stripped of its tags is one enormous line for it to do that on.
+Match against a bounded pattern, work line by line, or extract with a real parser.
+
+Bounding the quantifiers does not save you, and neither does using a negated class instead of `.`.
+`class="[^"]{0,60}(error|alert|invalid|danger)[^"]{0,60}"` reached 7.3 GB in 90 seconds on a single saved HTML page on 2026-08-05.
+The alternation is what multiplies; the quantifiers only decide how fast.
+
+**This applies to the Grep tool, not only to the shell.**
+Claude Code's Grep tool execs `ugrep` directly, so it never passes through a login shell and the 2 GB `cap` wrapper in `~/.bashrc` does not apply to it.
+Everything the Grep tool runs is uncapped.
+That is the one hole in the memory ceiling, and it is the hole both freezes came through.
+Until the Grep tool can be capped, its pattern is the only thing standing between a search and the swap file.
+
+**Prefer a remote MCP server over a locally spawned one.**
+A remote HTTP server is a shared connection that costs nothing per session, while a locally spawned one is a fresh process tree every time.
+When both exist for the same service, disable the local duplicate.
+
+**A frozen machine with the disk light pinned is almost always swap, not disk space.**
+Read `free -h` before `df -h` and confirm from the swap row.
+Chasing disk capacity when the real problem is paging wastes the whole investigation.
 
 ## Working with me
 
