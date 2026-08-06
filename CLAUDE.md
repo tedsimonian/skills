@@ -18,6 +18,8 @@ Assume no second reviewer exists unless the repo says otherwise.
 
 ## Voice
 
+Talk in ASD-STE100 Simplified Technical English, and use ubiquitous language.
+
 When you write or post anything on my behalf, read `~/VOICE.md` first and match how I talk.
 This covers public posts, comments, replies, announcements, and anything sent under my name.
 It does not cover neutral engineering artifacts like commit messages or PR templates.
