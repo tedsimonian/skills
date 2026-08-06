@@ -808,4 +808,3 @@ Every workflow file MUST include a header comment block explaining:
 - [eslint-guide.md](eslint-guide.md) - Rule-by-rule ESLint playbook
 - [monorepo-setup.md](monorepo-setup.md) - Monorepo structure and tooling
 - [quick-reference.md](quick-reference.md) - One-page lookup
-- [security.md](security.md) - Security patterns and checklists
