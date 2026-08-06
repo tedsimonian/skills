@@ -51,11 +51,21 @@ ln -sf "$PWD/VOICE.md"  ~/VOICE.md         # CLAUDE.md references this path
 Both links point back into this checkout, so moving or deleting it leaves them dangling and the
 global config silently disappears. Keep the clone somewhere permanent.
 
-Skills, either globally or into a single repo:
+Skills, either globally or into a single repo.
+Globally, symlink for the same reason as above, so an edit here reaches every project at once:
 
 ```bash
-cp -r skills/* ~/.claude/skills/          # every project
-cp -r skills/* /path/to/repo/.claude/skills/   # one project
+for s in skills/*/; do ln -sfn "$PWD/${s%/}" ~/.claude/skills/; done   # every project
+```
+
+Re-running the command is safe, because with a directory as the destination `-f` replaces each link in place.
+The `-n` only matters if you name the link explicitly, where `ln -sf src ~/.claude/skills/alpha` would follow an existing `alpha` link and create `alpha/alpha` inside its target.
+
+Into a single repo, copy instead, so the skill is committed alongside the code it governs and
+survives for anyone who clones that repo without this one:
+
+```bash
+cp -r skills/coding-standards /path/to/repo/.claude/skills/   # one project
 ```
 
 ## About CLAUDE.md
