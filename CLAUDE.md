@@ -264,15 +264,12 @@ Do not loop on it.
 
 ## Resource discipline
 
-This machine has 11 GB of RAM and an 8 GB swap file.
-Agent work has frozen it twice, so treat the rules below as hard limits rather than preferences.
+There is no fixed cap on how many agent sessions run at once.
+Size the fleet to the machine you are actually on, and read `free -h` rather than a remembered number.
 
-**Four agent sessions at once, counted across the whole tree.**
-Never run more than four concurrently, and never delegate to a sub-agent or background agent from inside one.
-A worker that fans out multiplies past the cap invisibly, because nothing upstream counts the children it spawns.
-Queue the rest and start one only when a slot frees.
-*Why:* a Claude session costs roughly 400 MB before it does any work, and every locally spawned MCP server it loads costs another 200 MB on top of that.
-Seven sessions sat at 4 GB idle, which left one bad command enough room to take the box down.
+**Never delegate to a sub-agent or background agent from inside one.**
+This is about control, not memory.
+A worker that fans out multiplies invisibly, because nothing upstream counts the children it spawns, so the real concurrency stops being something anyone can see or stop.
 
 **Bound every command that reads input you did not write.**
 Web pages, API responses, log files, and search output are all unbounded until proven otherwise.
