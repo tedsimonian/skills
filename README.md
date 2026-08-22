@@ -6,8 +6,9 @@ Code skills I want available across projects.
 ## Contents
 
 ```
-CLAUDE.md      global working agreements, applied to every project
-VOICE.md       how I write, for anything posted under my name
+CLAUDE.md              global working agreements, applied to every project
+VOICE.md               how I write, for anything posted under my name
+.no-mistakes.yaml      tells the validation pipeline this repository has no continuous integration
 skills/
   coding-standards/    framework-agnostic TypeScript and React standards: strict typing,
                        ESM, React patterns, error handling, service layer, security,
@@ -16,7 +17,7 @@ skills/
                        Diataxis authoring and maintenance workflows, README templates,
                        MDX component docs, Vocs setup, validate-docs script  (10 files)
   monorepo-testing/    Vitest, Playwright, Storybook, Checkly, Inngest, CI, naming, gotchas,
-                       plus four scaffold scripts  (16 files)
+                       plus three scaffold scripts and a setup audit script  (15 files)
 ```
 
 The `documentation` skill starts by discovering the project profile (docs root, generator,
@@ -27,16 +28,22 @@ Docusaurus, Nextra, Starlight, VitePress, Mintlify, or a plain Markdown tree.
 
 `CLAUDE.md` describes a development flow that assumes these are installed globally:
 
-- [treehouse](https://github.com/kunchenguid/treehouse) - pooled, pre-warmed git worktrees
+- [treehouse](https://github.com/kunchenguid/treehouse) - pooled, pre-warmed git worktrees, used for
+  every worktree the flow creates
 - [fallow](https://github.com/fallow-rs/fallow) - the commit gate, for TypeScript and JavaScript repos
-- [no-mistakes](https://github.com/kunchenguid/no-mistakes) - the push gate, which validates a branch
-  and opens the pull request
 - [`gh`](https://cli.github.com/), authenticated, since `gh-axi` runs on top of it
+- [`gh-axi`](https://github.com/kunchenguid/gh-axi) - the agent-facing interface for anything
+  touching GitHub, used ahead of `gh` directly
+- [`chrome-devtools-axi`](https://github.com/kunchenguid/chrome-devtools-axi) - the agent-facing
+  interface for anything needing a real browser
 
-Plus, inside Claude Code: the `mattpocock-skills` plugin, and the `gh-axi` and `chrome-devtools-axi`
-skills in `~/.claude/skills/`.
+Plus, inside Claude Code: the [`mattpocock-skills`](https://github.com/mattpocock/skills) plugin
+for issue tracking.
 
-Without them, that section of `CLAUDE.md` refers to tools the machine does not have.
+Everything heavier than the commit gate belongs to the multi-agent orchestrator, which reviews,
+tests, and green-lights a branch before it merges. That is not a tool you install here.
+
+Without the list above, `CLAUDE.md` refers to tools the machine does not have.
 
 ## Installing
 
