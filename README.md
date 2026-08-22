@@ -6,8 +6,9 @@ Code skills I want available across projects.
 ## Contents
 
 ```
-CLAUDE.md      global working agreements, applied to every project
-VOICE.md       how I write, for anything posted under my name
+CLAUDE.md              global working agreements, applied to every project
+VOICE.md               how I write, for anything posted under my name
+.no-mistakes.yaml      tells the validation pipeline this repository has no continuous integration
 skills/
   coding-standards/    framework-agnostic TypeScript and React standards: strict typing,
                        ESM, React patterns, error handling, service layer, security,
@@ -32,8 +33,10 @@ Docusaurus, Nextra, Starlight, VitePress, Mintlify, or a plain Markdown tree.
 - [fallow](https://github.com/fallow-rs/fallow) - the commit gate, for TypeScript and JavaScript repos
 - [`gh`](https://cli.github.com/), authenticated, since `gh-axi` runs on top of it
 
-Plus, inside Claude Code: the `mattpocock-skills` plugin for issue tracking, and the `gh-axi` and
-`chrome-devtools-axi` skills in `~/.claude/skills/`.
+Plus, inside Claude Code: the [`mattpocock-skills`](https://github.com/mattpocock/skills) plugin
+for issue tracking, and the [`gh-axi`](https://github.com/kunchenguid/gh-axi) and
+[`chrome-devtools-axi`](https://github.com/kunchenguid/chrome-devtools-axi) skills in
+`~/.claude/skills/`.
 
 Everything heavier than the commit gate belongs to the multi-agent orchestrator, which reviews,
 tests, and green-lights a branch before it merges. That is not a tool you install here.
