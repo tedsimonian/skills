@@ -43,7 +43,7 @@ for issue tracking.
 Everything heavier than the commit gate belongs to the multi-agent orchestrator, which reviews,
 tests, and green-lights a branch before it merges. That is not a tool you install here.
 
-Without the list above, that section of `CLAUDE.md` refers to tools the machine does not have.
+Without the list above, `CLAUDE.md` refers to tools the machine does not have.
 
 ## Installing
 
