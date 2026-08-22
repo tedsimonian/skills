@@ -1,0 +1,7 @@
+# Repository configuration for no-mistakes.
+# This repository holds Markdown skills only. It has no .github/workflows/, so
+# GitHub never reports a check against a pull request head. Without this
+# declaration the pipeline waits for a verdict that cannot arrive and times out
+# against the 168 hour CI window.
+# no-mistakes trusts this file only when it is read from the default branch.
+no_ci: true

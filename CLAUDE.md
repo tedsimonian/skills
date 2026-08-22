@@ -313,6 +313,11 @@ Overwrite it rather than appending history, since git already holds the past.
 Do not shut down a running dev stack unless I ask.
 Check whether it is already up before starting anything, and never launch a second instance against a port that already answers.
 
+## Gate policy
+
+Recorded 2026-08-22: this repository merges green-lit code.
+Commits stay cheap, and `fallow audit`, typecheck, lint and format run once over the branch before it merges.
+
 ---
 
 *Compiled from per-project agent memory across equity-agent, necromaster, necromaster-unreal, project-boardgame, plugin-figma, plugin-aftereffects, and toolkit-js, plus rules stated directly.
