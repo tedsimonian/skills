@@ -17,7 +17,7 @@ skills/
                        Diataxis authoring and maintenance workflows, README templates,
                        MDX component docs, Vocs setup, validate-docs script  (10 files)
   monorepo-testing/    Vitest, Playwright, Storybook, Checkly, Inngest, CI, naming, gotchas,
-                       plus four scaffold scripts  (16 files)
+                       plus three scaffold scripts and a setup audit script  (15 files)
 ```
 
 The `documentation` skill starts by discovering the project profile (docs root, generator,
@@ -32,11 +32,13 @@ Docusaurus, Nextra, Starlight, VitePress, Mintlify, or a plain Markdown tree.
   every worktree the flow creates
 - [fallow](https://github.com/fallow-rs/fallow) - the commit gate, for TypeScript and JavaScript repos
 - [`gh`](https://cli.github.com/), authenticated, since `gh-axi` runs on top of it
+- [`gh-axi`](https://github.com/kunchenguid/gh-axi) - the agent-facing interface for anything
+  touching GitHub, used ahead of `gh` directly
+- [`chrome-devtools-axi`](https://github.com/kunchenguid/chrome-devtools-axi) - the agent-facing
+  interface for anything needing a real browser
 
 Plus, inside Claude Code: the [`mattpocock-skills`](https://github.com/mattpocock/skills) plugin
-for issue tracking, and the [`gh-axi`](https://github.com/kunchenguid/gh-axi) and
-[`chrome-devtools-axi`](https://github.com/kunchenguid/chrome-devtools-axi) skills in
-`~/.claude/skills/`.
+for issue tracking.
 
 Everything heavier than the commit gate belongs to the multi-agent orchestrator, which reviews,
 tests, and green-lights a branch before it merges. That is not a tool you install here.
